@@ -1,0 +1,46 @@
+name: Bug report
+description: Something does not work as expected.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do **not** paste passwords, tokens, email addresses, measurements or other personal data.
+        Check [troubleshooting](https://github.com/kaftee/tanita-synchro/blob/main/docs/troubleshooting.md) first.
+  - type: input
+    id: command
+    attributes:
+      label: Command you ran
+      placeholder: tanita-synchro --since 2026-09-01
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What happened
+      description: Paste the error or output (remove weights and dates you do not want to share).
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: false
+  - type: input
+    id: scale
+    attributes:
+      label: Tanita scale model
+      placeholder: RD-953
+    validations:
+      required: false
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Output of `tanita-synchro --version`, `python --version` and `pip show garminconnect | grep Version`
+      placeholder: "tanita-synchro 0.1.0, garminconnect 0.3.17, Python 3.13"
+    validations:
+      required: true

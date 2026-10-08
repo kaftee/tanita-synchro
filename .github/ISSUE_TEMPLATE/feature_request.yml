@@ -1,0 +1,27 @@
+name: Feature request
+description: Ask for a new feature, another scale model or another destination.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Please do **not** paste passwords, tokens or personal data.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is this about?
+      options:
+        - A measurement that is not sent to Garmin
+        - Another destination (Strava, Apple Health, ...)
+        - Improvement to an existing feature
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe what you would like
+      description: What should tanita-synchro do, and why would it help you?
+    validations:
+      required: true

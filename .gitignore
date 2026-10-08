@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Secrets & sessions (never commit)
+.garminconnect
+*.token
+
+# Local exports / dumps
+*.csv
+*_dump/
+
+# Test artifacts
+.coverage
+.pytest_cache/
+htmlcov/
