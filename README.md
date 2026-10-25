@@ -33,6 +33,8 @@ bring over your whole history, then let it run on a schedule.
 - **History backfill** — `--all` uploads everything in your MyTanita account.
 - **Dry run** — `--dry-run` shows what would be uploaded.
 - **Scheduling on macOS** — a launchd agent runs the sync twice a day.
+- **Failure mail** — `--notify` mails you when a run fails, e.g. when the
+  Garmin session has expired (SMTP, Gmail by default).
 - Your MyTanita password stays in the macOS Keychain (or in environment
   variables); the Garmin session is cached so MFA is needed only once.
 
@@ -76,6 +78,7 @@ From a git checkout with its `.venv` set up (see
 
 ```bash
 launchd/install.sh      # runs at 10:00 and 20:00; missed runs happen after wake
+launchd/install.sh --notify you@example.com   # the same, mailing you when a run fails
 tail -f ~/Library/Logs/tanita-synchro.log
 launchd/uninstall.sh
 ```

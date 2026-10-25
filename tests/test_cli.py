@@ -63,3 +63,61 @@ def test_sign_in_error_is_reported(setup, monkeypatch, capsys):
     monkeypatch.setattr(cli, "credentials", broken)
     assert cli.main(["--all"]) == cli.EXIT_ERROR
     assert "MyTanita sign-in failed" in capsys.readouterr().err
+
+
+@pytest.fixture
+def mails(monkeypatch):
+    """Failure mails the CLI sends, as (to, sender, error)."""
+    sent = []
+    monkeypatch.setattr(cli.notify, "failure", lambda server, to, sender, error: sent.append((to, sender, error)))
+    return sent
+
+
+def test_failure_is_mailed(setup, mails, monkeypatch):
+    setup()
+
+    def expired(tokenstore):
+        raise garmin.GarminError("Garmin session in ~/.garminconnect is missing or expired")
+    monkeypatch.setattr(garmin, "login", expired)
+    assert cli.main(["--all", "--notify", "me@example.com", "--mail-from", "bot@example.com"]) == cli.EXIT_ERROR
+    assert mails == [("me@example.com", "bot@example.com",
+                      "error: Garmin session in ~/.garminconnect is missing or expired")]
+
+
+def test_failed_upload_is_mailed(setup, mails):
+    setup(fail=True)
+    assert cli.main(["--all", "--delay", "0", "--notify", "me@example.com"]) == cli.EXIT_UPLOAD_FAILED
+    assert len(mails) == 1
+
+
+def test_unexpected_error_is_mailed(setup, mails, monkeypatch):
+    setup()
+
+    def offline(tokenstore):
+        raise ConnectionError("network is unreachable")
+    monkeypatch.setattr(garmin, "login", offline)
+    assert cli.main(["--all", "--notify", "me@example.com"]) == cli.EXIT_ERROR
+    assert mails[0][2] == "ConnectionError: network is unreachable"
+
+
+def test_no_mail_on_success_or_without_notify(setup, mails):
+    setup()
+    assert cli.main(["--all", "--delay", "0", "--notify", "me@example.com"]) == cli.EXIT_OK
+    setup(fail=True)
+    assert cli.main(["--all", "--delay", "0"]) == cli.EXIT_UPLOAD_FAILED
+    assert mails == []
+
+
+def test_mail_failure_keeps_exit_code(setup, monkeypatch, capsys):
+    setup(fail=True)
+
+    def broken(*args):
+        raise cli.notify.NotifyError("mail via smtp.example.com failed")
+    monkeypatch.setattr(cli.notify, "failure", broken)
+    assert cli.main(["--all", "--delay", "0", "--notify", "me@example.com"]) == cli.EXIT_UPLOAD_FAILED
+    assert "not mailed: mail via smtp.example.com failed" in capsys.readouterr().err
+
+
+def test_test_notify_needs_an_address():
+    with pytest.raises(SystemExit):
+        cli.main(["--test-notify"])

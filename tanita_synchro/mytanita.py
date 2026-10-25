@@ -38,15 +38,14 @@ class Measurement:
     physique_rating: float | None
 
 
-def _dialog(prompt: str, hidden: bool = False) -> str:
+def dialog(prompt: str, hidden: bool = False) -> str | None:
+    """Ask in a macOS dialog; None when cancelled."""
     script = (f'display dialog "{prompt}" default answer "" '
               f'{"with hidden answer " if hidden else ""}'
               'with title "tanita-synchro" buttons {"Cancel", "OK"} default button "OK"')
     r = subprocess.run(["osascript", "-e", script, "-e", "text returned of result"],
                        capture_output=True, text=True)
-    if r.returncode != 0:
-        raise MyTanitaError("MyTanita sign-in cancelled")
-    return r.stdout.rstrip("\n")
+    return r.stdout.rstrip("\n") if r.returncode == 0 else None
 
 
 def credentials() -> tuple[str, str]:
@@ -63,8 +62,10 @@ def credentials() -> tuple[str, str]:
         creds = keychain_credentials()
         if creds:
             return creds
-        email = _dialog("MyTanita email:")
-        password = _dialog("MyTanita password:", hidden=True)
+        email = dialog("MyTanita email:")
+        password = dialog("MyTanita password:", hidden=True) if email is not None else None
+        if email is None or password is None:
+            raise MyTanitaError("MyTanita sign-in cancelled")
     elif sys.stdin.isatty():
         email = input("MyTanita email: ").strip()
         password = getpass.getpass("MyTanita password: ")
@@ -72,19 +73,23 @@ def credentials() -> tuple[str, str]:
         raise MyTanitaError("Set MYTANITA_EMAIL and MYTANITA_PASSWORD")
     MyTanita().login(email, password)
     if sys.platform == "darwin":
-        subprocess.run(["security", "add-generic-password", "-U", "-s", KEYCHAIN_SERVICE,
-                        "-a", email, "-w", password], check=True)
+        save_keychain_credentials(email, password)
     return email, password
 
 
-def keychain_credentials() -> tuple[str, str] | None:
-    r = subprocess.run(["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-g"],
+def keychain_credentials(service: str = KEYCHAIN_SERVICE) -> tuple[str, str] | None:
+    r = subprocess.run(["security", "find-generic-password", "-s", service, "-g"],
                        capture_output=True, text=True)
     if r.returncode != 0:
         return None
     acct = re.search(r'"acct"<blob>="([^"]*)"', r.stdout)
     pw = re.search(r'password: "(.*)"', r.stderr)
     return (acct.group(1), pw.group(1)) if acct and pw else None
+
+
+def save_keychain_credentials(account: str, password: str, service: str = KEYCHAIN_SERVICE) -> None:
+    subprocess.run(["security", "add-generic-password", "-U", "-s", service,
+                    "-a", account, "-w", password], check=True)
 
 
 def local_zone() -> ZoneInfo:

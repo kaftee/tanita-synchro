@@ -46,6 +46,31 @@ as 6.
 The other measurements went through. Run the same command again: only the
 missing ones are uploaded.
 
+## Failure mail
+
+### `not mailed: no SMTP login saved; run once with --test-notify`
+
+The SMTP login is saved by `--test-notify`, never by a scheduled run. Run it
+once in a terminal with the same `--notify` and `--mail-from` options.
+
+### `mail via smtp.gmail.com failed at login: (535, ...)` or `(534, ... Application-specific password required)`
+
+Gmail rejected the login: 535 for an unknown login or a wrong password, 534
+for the account password instead of an
+[app password](https://myaccount.google.com/apppasswords). The login is the
+Google account's own address, not a *Send mail as* alias. Replace the saved
+login and test again:
+
+```bash
+security delete-generic-password -s tanita-synchro-smtp
+tanita-synchro --test-notify --notify you@example.com
+```
+
+### The mail comes from the Gmail address, not from `--mail-from`
+
+Gmail sends only from addresses added under Settings → Accounts and Import →
+*Send mail as*. Add and verify the address there.
+
 ## Undoing an upload
 
 Delete the weigh-in in Garmin Connect (Health Stats → Weight → the bin icon next

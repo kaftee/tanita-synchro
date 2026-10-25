@@ -8,10 +8,11 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+import traceback
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from . import __version__, garmin
+from . import __version__, garmin, notify
 from .mytanita import MyTanita, MyTanitaError, credentials
 
 EXIT_OK, EXIT_UPLOAD_FAILED, EXIT_ERROR = 0, 1, 2
@@ -37,19 +38,52 @@ def build_parser() -> argparse.ArgumentParser:
                    help="time zone of the MyTanita times, e.g. Europe/Warsaw (default: system)")
     p.add_argument("--delay", type=float, default=1.0, metavar="SECONDS",
                    help="pause between uploads (default: %(default)s)")
+    mail = p.add_argument_group("failure mail")
+    mail.add_argument("--notify", metavar="ADDRESS", help="mail this address when the run fails")
+    mail.add_argument("--mail-from", metavar="ADDRESS",
+                      help="sender of the mail (default: the SMTP login)")
+    mail.add_argument("--smtp-server", default=notify.DEFAULT_SERVER, metavar="HOST[:PORT]",
+                      help="SMTP server; port 465 uses SSL, others STARTTLS (default: %(default)s)")
+    mail.add_argument("--test-notify", action="store_true",
+                      help="send a test mail to --notify, asking for the SMTP login once, and exit")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.test_notify:
+        if not args.notify:
+            parser.error("--test-notify needs --notify ADDRESS")
+        try:
+            notify.setup(args.smtp_server, args.notify, args.mail_from)
+        except notify.NotifyError as e:
+            _log(f"error: {e}", err=True)
+            return EXIT_ERROR
+        _log(f"Test mail sent to {args.notify}.")
+        return EXIT_OK
+
+    error = None
     try:
-        return sync(args)
+        code = sync(args)
+        if code == EXIT_UPLOAD_FAILED:
+            error = "Some uploads to Garmin failed; the next run retries them."
     except (MyTanitaError, garmin.GarminError) as e:
         _log(f"error: {e}", err=True)
-        return EXIT_ERROR
+        code, error = EXIT_ERROR, f"error: {e}"
     except KeyboardInterrupt:
         return EXIT_ERROR
+    except Exception as e:
+        traceback.print_exc()
+        code, error = EXIT_ERROR, "".join(traceback.format_exception_only(e)).strip()
+    if error and args.notify and not args.dry_run:
+        try:
+            notify.failure(args.smtp_server, args.notify, args.mail_from, error)
+            _log(f"Failure mailed to {args.notify}.")
+        except notify.NotifyError as e:
+            _log(f"not mailed: {e}", err=True)
+    return code
 
 
 def sync(args: argparse.Namespace) -> int:

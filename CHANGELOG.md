@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Failure mail: `--notify ADDRESS` mails the error when a run fails, over SMTP
+  (`--smtp-server`, Gmail by default; `--mail-from` for the sender).
+  `--test-notify` sends a test mail and saves the SMTP login to the macOS
+  Keychain; `SMTP_USER` / `SMTP_PASSWORD` work too.
+- `launchd/install.sh` passes its arguments on to every scheduled run.
+
+### Changed
+- An unexpected error (e.g. no network) now ends the run with exit code 2 (was
+  1, the same as failed uploads).
+
 ## 0.1.0
 
 First release.
