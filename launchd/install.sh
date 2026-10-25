@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install (or reinstall) the launchd agent that runs tanita-synchro at 10:00 and 20:00.
+# Install (or reinstall) the launchd agent that runs tanita-synchro at 9:30 and 20:00.
 # Arguments are passed on to every run, e.g. launchd/install.sh --notify you@example.com
 set -eu
 LABEL=com.kaftee.tanita-synchro
@@ -25,7 +25,7 @@ cat > "$PLIST" <<PLIST
     <dict><key>PYTHONUNBUFFERED</key><string>1</string></dict>
     <key>StartCalendarInterval</key>
     <array>
-        <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>30</integer></dict>
         <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
     </array>
     <key>StandardOutPath</key><string>$LOG</string>

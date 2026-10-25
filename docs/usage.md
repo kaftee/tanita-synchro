@@ -66,7 +66,7 @@ launchd/install.sh
 ```
 
 installs a launchd agent (`com.kaftee.tanita-synchro`) that runs the sync from
-this checkout at 10:00 and 20:00. If the Mac was asleep, the missed run happens
+this checkout at 9:30 and 20:00. If the Mac was asleep, the missed run happens
 after wake. Output goes to `~/Library/Logs/tanita-synchro.log`.
 
 ```bash

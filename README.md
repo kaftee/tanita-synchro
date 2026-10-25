@@ -77,7 +77,7 @@ From a git checkout with its `.venv` set up (see
 [Contributing](https://github.com/kaftee/tanita-synchro/blob/main/CONTRIBUTING.md#development-setup)):
 
 ```bash
-launchd/install.sh      # runs at 10:00 and 20:00; missed runs happen after wake
+launchd/install.sh      # runs at 9:30 and 20:00; missed runs happen after wake
 launchd/install.sh --notify you@example.com   # the same, mailing you when a run fails
 tail -f ~/Library/Logs/tanita-synchro.log
 launchd/uninstall.sh
