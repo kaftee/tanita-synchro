@@ -1,4 +1,5 @@
 import pytest
+import requests
 
 from tanita_synchro import cli, garmin, mytanita
 from tanita_synchro.mytanita import parse_csv
@@ -97,7 +98,7 @@ def test_unexpected_error_is_mailed(setup, mails, monkeypatch):
         raise ConnectionError("network is unreachable")
     monkeypatch.setattr(garmin, "login", offline)
     assert cli.main(["--all", "--notify", "me@example.com"]) == cli.EXIT_ERROR
-    assert mails[0][2] == "ConnectionError: network is unreachable"
+    assert mails == [("me@example.com", None, "ConnectionError: network is unreachable")]
 
 
 def test_no_mail_on_success_or_without_notify(setup, mails):
@@ -116,6 +117,100 @@ def test_mail_failure_keeps_exit_code(setup, monkeypatch, capsys):
     monkeypatch.setattr(cli.notify, "failure", broken)
     assert cli.main(["--all", "--delay", "0", "--notify", "me@example.com"]) == cli.EXIT_UPLOAD_FAILED
     assert "not mailed: mail via smtp.example.com failed" in capsys.readouterr().err
+
+
+@pytest.fixture(autouse=True)
+def sleeps(monkeypatch):
+    """Pauses the CLI took between tries, in seconds (never really slept; --delay 0 pauses are left out)."""
+    taken = []
+    monkeypatch.setattr(cli.time, "sleep", lambda s: taken.append(s) if s else None)
+    return taken
+
+
+@pytest.fixture
+def flaky_tanita(monkeypatch, csv_text):
+    """Make the MyTanita export raise each of ``errors`` in turn, then work."""
+    def make(*errors):
+        left = list(errors)
+
+        class FlakyTanita:
+            def login(self, email, password):
+                pass
+
+            def measurements(self, tz=None):
+                if left:
+                    raise left.pop(0)
+                return parse_csv(csv_text, WARSAW)
+
+        monkeypatch.setattr(cli, "MyTanita", FlakyTanita)
+    return make
+
+
+def _http_error(status):
+    response = requests.Response()
+    response.status_code = status
+    return requests.HTTPError(f"{status} error", response=response)
+
+
+def test_network_failure_is_retried(setup, flaky_tanita, sleeps, mails):
+    api = setup()
+    flaky_tanita(requests.ConnectionError("Connection reset by peer"), requests.Timeout("read timed out"))
+    assert cli.main(["--all", "--delay", "0", "--notify", "me@example.com"]) == cli.EXIT_OK
+    assert sleeps == list(cli.RETRY_DELAYS[:2])
+    assert len(api.uploads) == 3
+    assert mails == []
+
+
+def test_server_error_is_retried_client_error_is_not(setup, flaky_tanita, sleeps):
+    setup()
+    flaky_tanita(_http_error(503))
+    assert cli.main(["--all", "--delay", "0"]) == cli.EXIT_OK
+    flaky_tanita(_http_error(404))
+    assert cli.main(["--all", "--delay", "0"]) == cli.EXIT_ERROR
+    assert sleeps == [cli.RETRY_DELAYS[0]]
+
+
+def test_wrong_password_is_not_retried(setup, sleeps, monkeypatch):
+    setup()
+
+    def wrong():
+        raise mytanita.MyTanitaError("MyTanita sign-in failed: check email and password")
+    monkeypatch.setattr(cli, "credentials", wrong)
+    assert cli.main(["--all"]) == cli.EXIT_ERROR
+    assert sleeps == []
+
+
+def test_garmin_resume_failing_on_the_network_is_retried(setup, sleeps, monkeypatch):
+    api = setup()
+    calls = []
+
+    def login(tokenstore):
+        calls.append(tokenstore)
+        if len(calls) == 1:
+            try:
+                raise requests.ConnectionError("Connection reset by peer")
+            except requests.ConnectionError:
+                raise garmin.GarminError("Garmin session is missing or expired")
+        return api
+    monkeypatch.setattr(garmin, "login", login)
+    assert cli.main(["--all", "--delay", "0"]) == cli.EXIT_OK
+    assert len(calls) == 2 and len(sleeps) == 1
+
+
+def test_gives_up_after_the_retries_and_mails_once(setup, flaky_tanita, sleeps, mails, capsys):
+    setup()
+    flaky_tanita(*[requests.ConnectionError("Connection reset by peer")] * 5)
+    assert cli.main(["--all", "--retries", "4", "--notify", "me@example.com"]) == cli.EXIT_ERROR
+    assert sleeps == [*cli.RETRY_DELAYS, cli.RETRY_DELAYS[-1]]
+    assert len(mails) == 1 and "Connection reset by peer" in mails[0][2]
+    assert capsys.readouterr().err.count("trying again in") == 4
+
+
+def test_retries_zero_tries_once(setup, flaky_tanita, sleeps):
+    setup()
+    flaky_tanita(requests.ConnectionError("Connection reset by peer"))
+    assert cli.main(["--all", "--retries", "0"]) == cli.EXIT_ERROR
+    assert sleeps == []
 
 
 def test_test_notify_needs_an_address():

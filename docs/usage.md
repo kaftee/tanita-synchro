@@ -2,7 +2,7 @@
 
 ```bash
 tanita-synchro [--since YYYY-MM-DD | --all] [--dry-run] [--timezone ZONE]
-               [--tokenstore DIR] [--delay SECONDS] [--version]
+               [--tokenstore DIR] [--delay SECONDS] [--retries N] [--version]
                [--notify ADDRESS [--mail-from ADDRESS] [--smtp-server HOST[:PORT]]]
 tanita-synchro --test-notify --notify ADDRESS [--mail-from ADDRESS] [--smtp-server HOST[:PORT]]
 ```
@@ -22,6 +22,7 @@ run with `--all` brings over your whole history; after that the default window
 | `--timezone ZONE` | system zone | Time zone the measurements were taken in, e.g. `Europe/Warsaw`. |
 | `--tokenstore DIR` | `~/.garminconnect` | Where the Garmin session is kept. |
 | `--delay SECONDS` | `1.0` | Pause between uploads, to stay gentle with Garmin. |
+| `--retries N` | `3` | Run again up to N times after a network failure or a MyTanita / Garmin server error (5xx), waiting 1, 5 and 15 minutes (then 15 each). `0` turns it off. |
 | `--version` | — | Print the version and exit. |
 | `--notify ADDRESS` | — | Mail this address when the run fails (see [Failure mail](#failure-mail)). |
 | `--mail-from ADDRESS` | SMTP login | Sender of the failure mail. |
@@ -82,7 +83,9 @@ Arguments to `install.sh` are passed on to every run, e.g.
 
 A scheduled run that fails (an expired Garmin session, a wrong MyTanita
 password, no network) only writes to the log. With `--notify ADDRESS`, every
-failed run also sends a short mail with the error. Nothing is lost while the
+failed run also sends a short mail with the error. A network failure or a server
+error is first tried again (`--retries`); the mail goes out only when the last
+try fails too. Nothing is lost while the
 sync is broken: the next successful run uploads whatever is still missing in its
 window. Dry runs never mail.
 

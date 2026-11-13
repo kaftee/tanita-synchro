@@ -8,6 +8,10 @@
   `--test-notify` sends a test mail and saves the SMTP login to the macOS
   Keychain; `SMTP_USER` / `SMTP_PASSWORD` work too.
 - `launchd/install.sh` passes its arguments on to every scheduled run.
+- Retries: a run that fails on the network (e.g. MyTanita resetting the
+  connection) or on a MyTanita / Garmin server error runs again after 1, 5 and
+  15 minutes (`--retries N`, default 3, `0` turns it off). A wrong password or
+  an expired Garmin session is not retried.
 
 ### Changed
 - An unexpected error (e.g. no network) now ends the run with exit code 2 (was

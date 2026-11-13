@@ -12,10 +12,15 @@ import traceback
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import requests
+
 from . import __version__, garmin, notify
 from .mytanita import MyTanita, MyTanitaError, credentials
 
 EXIT_OK, EXIT_UPLOAD_FAILED, EXIT_ERROR = 0, 1, 2
+# Pauses before each new try after a network failure or a server error (seconds); further tries wait the last one.
+# Three tries take a scheduled 9:30 run to about 9:52 at most.
+RETRY_DELAYS = (60, 300, 900)
 
 
 def _log(msg: str, err: bool = False) -> None:
@@ -38,6 +43,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="time zone of the MyTanita times, e.g. Europe/Warsaw (default: system)")
     p.add_argument("--delay", type=float, default=1.0, metavar="SECONDS",
                    help="pause between uploads (default: %(default)s)")
+    p.add_argument("--retries", type=int, default=len(RETRY_DELAYS), metavar="N",
+                   help="run again up to N times after a network failure or a MyTanita/Garmin server error, "
+                        f"waiting {', '.join(f'{d // 60} min' for d in RETRY_DELAYS)} (default: %(default)s)")
     mail = p.add_argument_group("failure mail")
     mail.add_argument("--notify", metavar="ADDRESS", help="mail this address when the run fails")
     mail.add_argument("--mail-from", metavar="ADDRESS",
@@ -66,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
 
     error = None
     try:
-        code = sync(args)
+        code = sync_with_retries(args)
         if code == EXIT_UPLOAD_FAILED:
             error = "Some uploads to Garmin failed; the next run retries them."
     except (MyTanitaError, garmin.GarminError) as e:
@@ -84,6 +92,39 @@ def main(argv: list[str] | None = None) -> int:
         except notify.NotifyError as e:
             _log(f"not mailed: {e}", err=True)
     return code
+
+
+def transient(e: BaseException) -> bool:
+    """A network failure or a server error (5xx), here or anywhere in the exception chain: worth another try.
+
+    The chain matters because a failed Garmin session resume surfaces as GarminError with the network error as its
+    context.
+    """
+    seen: set[int] = set()
+    cur: BaseException | None = e
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if isinstance(cur, (requests.ConnectionError, requests.Timeout, ConnectionError, TimeoutError)):
+            return True
+        if isinstance(cur, requests.HTTPError) and cur.response is not None and cur.response.status_code >= 500:
+            return True
+        cur = cur.__cause__ or cur.__context__
+    return False
+
+
+def sync_with_retries(args: argparse.Namespace) -> int:
+    """sync(), run again after a transient failure; safe because a run skips what Garmin already has."""
+    delays = [RETRY_DELAYS[min(i, len(RETRY_DELAYS) - 1)] for i in range(max(args.retries, 0))]
+    for attempt, delay in enumerate([*delays, None]):
+        try:
+            return sync(args)
+        except Exception as e:
+            if delay is None or not transient(e):
+                raise
+            reason = "".join(traceback.format_exception_only(e)).strip()
+            _log(f"{reason[:300]}; trying again in {delay // 60} min ({attempt + 1}/{len(delays)})", err=True)
+            time.sleep(delay)
+    raise AssertionError("unreachable")
 
 
 def sync(args: argparse.Namespace) -> int:
