@@ -7,7 +7,8 @@
   (`--smtp-server`, Gmail by default; `--mail-from` for the sender).
   `--test-notify` sends a test mail and saves the SMTP login to the macOS
   Keychain; `SMTP_USER` / `SMTP_PASSWORD` work too.
-- `launchd/install.sh` passes its arguments on to every scheduled run.
+- `launchd/install.sh` passes its arguments on to every scheduled run;
+  `SCHEDULE="HH:MM ..."` sets other run times than 9:30 and 20:00.
 - Retries: a run that fails on the network (e.g. MyTanita resetting the
   connection) or on a MyTanita / Garmin server error runs again after 1, 5 and
   15 minutes (`--retries N`, default 3, `0` turns it off). A wrong password or

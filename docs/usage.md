@@ -79,6 +79,14 @@ Sign in to Garmin once in a terminal before installing, so the session exists.
 Arguments to `install.sh` are passed on to every run, e.g.
 `launchd/install.sh --notify you@example.com`.
 
+`SCHEDULE` sets other run times (`HH:MM`, space-separated). If you weigh in
+anywhere between 6:00 and 12:00, an hourly morning run gets each weigh-in to
+Garmin within the hour:
+
+```bash
+SCHEDULE="6:45 7:45 8:45 9:45 10:45 11:45 12:45 20:00" launchd/install.sh
+```
+
 ## Failure mail
 
 A scheduled run that fails (an expired Garmin session, a wrong MyTanita
