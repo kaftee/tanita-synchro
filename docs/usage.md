@@ -2,7 +2,8 @@
 
 ```bash
 tanita-synchro [--since YYYY-MM-DD | --all] [--dry-run] [--timezone ZONE]
-               [--tokenstore DIR] [--delay SECONDS] [--retries N] [--version]
+               [--tokenstore DIR] [--delay SECONDS] [--retries N]
+               [--after-upload COMMAND] [--version]
                [--notify ADDRESS [--mail-from ADDRESS] [--smtp-server HOST[:PORT]]]
 tanita-synchro --test-notify --notify ADDRESS [--mail-from ADDRESS] [--smtp-server HOST[:PORT]]
 ```
@@ -23,6 +24,7 @@ run with `--all` brings over your whole history; after that the default window
 | `--tokenstore DIR` | `~/.garminconnect` | Where the Garmin session is kept. |
 | `--delay SECONDS` | `1.0` | Pause between uploads, to stay gentle with Garmin. |
 | `--retries N` | `3` | Run again up to N times after a network failure or a MyTanita / Garmin server error (5xx), waiting 1, 5 and 15 minutes (then 15 each). `0` turns it off. |
+| `--after-upload COMMAND` | — | Shell command run after a run that uploaded at least one measurement, e.g. to make another app fetch the new weigh-in from Garmin. Its failure is only logged; it is stopped after 10 minutes. |
 | `--version` | — | Print the version and exit. |
 | `--notify ADDRESS` | — | Mail this address when the run fails (see [Failure mail](#failure-mail)). |
 | `--mail-from ADDRESS` | SMTP login | Sender of the failure mail. |
@@ -79,12 +81,14 @@ Sign in to Garmin once in a terminal before installing, so the session exists.
 Arguments to `install.sh` are passed on to every run, e.g.
 `launchd/install.sh --notify you@example.com`.
 
-`SCHEDULE` sets other run times (`HH:MM`, space-separated). If you weigh in
-anywhere between 6:00 and 12:00, an hourly morning run gets each weigh-in to
-Garmin within the hour:
+`SCHEDULE` sets other run times (`HH:MM`, space-separated). If you always weigh
+in between 6:00 and 11:00, a run every 15 minutes gets each weigh-in to Garmin
+within a quarter of an hour (a run in progress, e.g. waiting to retry, makes
+launchd skip the next one):
 
 ```bash
-SCHEDULE="6:45 7:45 8:45 9:45 10:45 11:45 12:45 20:00" launchd/install.sh
+SCHEDULE="$(for h in 6 7 8 9 10; do printf '%s:00 %s:15 %s:30 %s:45 ' $h $h $h $h; done)11:00 11:15" \
+  launchd/install.sh
 ```
 
 ## Failure mail

@@ -6,6 +6,7 @@ when Garmin already has a weigh-in at the same time, so runs are safe to repeat.
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 import time
 import traceback
@@ -21,6 +22,7 @@ EXIT_OK, EXIT_UPLOAD_FAILED, EXIT_ERROR = 0, 1, 2
 # Pauses before each new try after a network failure or a server error (seconds); further tries wait the last one.
 # Three tries take a scheduled 9:30 run to about 9:52 at most.
 RETRY_DELAYS = (60, 300, 900)
+AFTER_UPLOAD_TIMEOUT = 600  # seconds
 
 
 def _log(msg: str, err: bool = False) -> None:
@@ -46,6 +48,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--retries", type=int, default=len(RETRY_DELAYS), metavar="N",
                    help="run again up to N times after a network failure or a MyTanita/Garmin server error, "
                         f"waiting {', '.join(f'{d // 60} min' for d in RETRY_DELAYS)} (default: %(default)s)")
+    p.add_argument("--after-upload", metavar="COMMAND",
+                   help="shell command to run after a run that uploaded something, e.g. to tell another app")
     mail = p.add_argument_group("failure mail")
     mail.add_argument("--notify", metavar="ADDRESS", help="mail this address when the run fails")
     mail.add_argument("--mail-from", metavar="ADDRESS",
@@ -74,9 +78,11 @@ def main(argv: list[str] | None = None) -> int:
 
     error = None
     try:
-        code = sync_with_retries(args)
+        code, uploaded = sync_with_retries(args)
         if code == EXIT_UPLOAD_FAILED:
             error = "Some uploads to Garmin failed; the next run retries them."
+        if uploaded and args.after_upload and not args.dry_run:
+            after_upload(args.after_upload)
     except (MyTanitaError, garmin.GarminError) as e:
         _log(f"error: {e}", err=True)
         code, error = EXIT_ERROR, f"error: {e}"
@@ -92,6 +98,18 @@ def main(argv: list[str] | None = None) -> int:
         except notify.NotifyError as e:
             _log(f"not mailed: {e}", err=True)
     return code
+
+
+def after_upload(command: str) -> None:
+    """Run the --after-upload command; its failure is only logged (the weigh-ins are in Garmin either way)."""
+    _log(f"after upload: {command}")
+    try:
+        r = subprocess.run(command, shell=True, timeout=AFTER_UPLOAD_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        _log(f"after upload: still running after {AFTER_UPLOAD_TIMEOUT} s, stopped", err=True)
+        return
+    if r.returncode:
+        _log(f"after upload: exit code {r.returncode}", err=True)
 
 
 def transient(e: BaseException) -> bool:
@@ -112,7 +130,7 @@ def transient(e: BaseException) -> bool:
     return False
 
 
-def sync_with_retries(args: argparse.Namespace) -> int:
+def sync_with_retries(args: argparse.Namespace) -> tuple[int, int]:
     """sync(), run again after a transient failure; safe because a run skips what Garmin already has."""
     delays = [RETRY_DELAYS[min(i, len(RETRY_DELAYS) - 1)] for i in range(max(args.retries, 0))]
     for attempt, delay in enumerate([*delays, None]):
@@ -127,7 +145,8 @@ def sync_with_retries(args: argparse.Namespace) -> int:
     raise AssertionError("unreachable")
 
 
-def sync(args: argparse.Namespace) -> int:
+def sync(args: argparse.Namespace) -> tuple[int, int]:
+    """Exit code and the number of measurements uploaded."""
     tanita = MyTanita()
     tanita.login(*credentials())
     measurements = tanita.measurements(args.timezone)
@@ -136,7 +155,7 @@ def sync(args: argparse.Namespace) -> int:
         measurements = [m for m in measurements if m.time.date() >= since]
     if not measurements:
         _log("No MyTanita measurements in range.")
-        return EXIT_OK
+        return EXIT_OK, 0
 
     api = garmin.login(args.tokenstore)
     existing = garmin.weigh_ins(api, measurements[0].time.date() - timedelta(days=1),
@@ -161,10 +180,11 @@ def sync(args: argparse.Namespace) -> int:
         if i < len(todo):
             time.sleep(args.delay)
 
+    uploaded = 0 if args.dry_run else len(todo) - failed
     if failed:
         _log(f"{failed} of {len(todo)} uploads failed", err=True)
-        return EXIT_UPLOAD_FAILED
-    return EXIT_OK
+        return EXIT_UPLOAD_FAILED, uploaded
+    return EXIT_OK, uploaded
 
 
 if __name__ == "__main__":

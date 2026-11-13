@@ -13,6 +13,8 @@
   connection) or on a MyTanita / Garmin server error runs again after 1, 5 and
   15 minutes (`--retries N`, default 3, `0` turns it off). A wrong password or
   an expired Garmin session is not retried.
+- `--after-upload COMMAND` runs a shell command after a run that uploaded
+  something, e.g. to make another app fetch the new weigh-in.
 
 ### Changed
 - An unexpected error (e.g. no network) now ends the run with exit code 2 (was

@@ -1,3 +1,5 @@
+import subprocess
+
 import pytest
 import requests
 
@@ -211,6 +213,50 @@ def test_retries_zero_tries_once(setup, flaky_tanita, sleeps):
     flaky_tanita(requests.ConnectionError("Connection reset by peer"))
     assert cli.main(["--all", "--retries", "0"]) == cli.EXIT_ERROR
     assert sleeps == []
+
+
+class Ran(list):
+    code = 0
+
+
+@pytest.fixture
+def commands(monkeypatch):
+    """Commands the CLI ran with the shell, each answered with exit code ``commands.code``."""
+    ran = Ran()
+
+    def run(command, shell, timeout):
+        ran.append(command)
+        return subprocess.CompletedProcess(command, ran.code)
+    monkeypatch.setattr(cli.subprocess, "run", run)
+    return ran
+
+
+def test_after_upload_runs_only_when_something_was_uploaded(setup, csv_text, commands):
+    first, *rest = parse_csv(csv_text, WARSAW)
+    setup()
+    assert cli.main(["--all", "--delay", "0", "--after-upload", "ssh host notify"]) == cli.EXIT_OK
+    assert commands == ["ssh host notify"]
+    # Everything already in Garmin, a dry run, or no option: nothing runs.
+    setup(existing=[_entry(m) for m in [first, *rest]])
+    assert cli.main(["--all", "--after-upload", "ssh host notify"]) == cli.EXIT_OK
+    setup()
+    assert cli.main(["--all", "--dry-run", "--after-upload", "ssh host notify"]) == cli.EXIT_OK
+    assert cli.main(["--all", "--delay", "0"]) == cli.EXIT_OK
+    assert commands == ["ssh host notify"]
+
+
+def test_after_upload_failure_is_only_logged(setup, commands, mails, capsys):
+    setup()
+    commands.code = 255
+    assert cli.main(["--all", "--delay", "0", "--after-upload", "false", "--notify", "me@example.com"]) == cli.EXIT_OK
+    assert "after upload: exit code 255" in capsys.readouterr().err
+    assert mails == []
+
+
+def test_after_upload_not_run_when_every_upload_failed(setup, commands):
+    setup(fail=True)  # every upload rejected: nothing new in Garmin
+    assert cli.main(["--all", "--delay", "0", "--after-upload", "x"]) == cli.EXIT_UPLOAD_FAILED
+    assert commands == []
 
 
 def test_test_notify_needs_an_address():
