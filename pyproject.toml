@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "pytest-cov"]
+dev = ["pytest>=7", "pytest-cov", "ruff==0.17.6"]
 
 [project.urls]
 Homepage = "https://github.com/kaftee/tanita-synchro"
@@ -48,3 +48,13 @@ packages = ["tanita_synchro"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/conftest.py" = ["E501"]  # the sample export keeps MyTanita's long CSV header on one line
