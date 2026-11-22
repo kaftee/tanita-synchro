@@ -1,6 +1,9 @@
 # tanita-synchro
 
 [![tests](https://github.com/kaftee/tanita-synchro/actions/workflows/tests.yml/badge.svg)](https://github.com/kaftee/tanita-synchro/actions/workflows/tests.yml)
+[![PyPI](https://img.shields.io/pypi/v/tanita-synchro)](https://pypi.org/project/tanita-synchro/)
+[![Python](https://img.shields.io/pypi/pyversions/tanita-synchro)](https://pypi.org/project/tanita-synchro/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/kaftee/tanita-synchro/blob/main/LICENSE)
 
 Copy your [Tanita](https://tanita.eu) scale measurements from
 [MyTanita](https://mytanita.eu) to [Garmin Connect](https://connect.garmin.com):
@@ -89,6 +92,7 @@ launchd/uninstall.sh
 - [How it works](https://github.com/kaftee/tanita-synchro/blob/main/docs/how-it-works.md) — MyTanita export, field mapping, Garmin upload
 - [Troubleshooting](https://github.com/kaftee/tanita-synchro/blob/main/docs/troubleshooting.md)
 - [Contributing](https://github.com/kaftee/tanita-synchro/blob/main/CONTRIBUTING.md)
+- [Security policy](https://github.com/kaftee/tanita-synchro/blob/main/SECURITY.md)
 - [Changelog](https://github.com/kaftee/tanita-synchro/blob/main/CHANGELOG.md)
 
 ## License

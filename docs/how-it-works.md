@@ -4,7 +4,8 @@
 tanita_synchro/
 ├── mytanita.py  MyTanita client: sign-in, CSV export, parsing; credentials
 ├── garmin.py    Garmin side: session, listing weigh-ins, FIT upload
-└── cli.py       Command-line entry point and the sync loop
+├── notify.py    Failure mail over SMTP (--notify, --test-notify)
+└── cli.py       Command-line entry point, the sync loop and retries
 ```
 
 ## MyTanita

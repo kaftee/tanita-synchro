@@ -97,9 +97,8 @@ A scheduled run that fails (an expired Garmin session, a wrong MyTanita
 password, no network) only writes to the log. With `--notify ADDRESS`, every
 failed run also sends a short mail with the error. A network failure or a server
 error is first tried again (`--retries`); the mail goes out only when the last
-try fails too. Nothing is lost while the
-sync is broken: the next successful run uploads whatever is still missing in its
-window. Dry runs never mail.
+try fails too. Nothing is lost while the sync is broken: the next successful run
+uploads whatever is still missing in its window. Dry runs never mail.
 
 With Gmail as the SMTP server (the default):
 
