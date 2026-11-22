@@ -1,3 +1,5 @@
+import subprocess
+
 import pytest
 
 from tanita_synchro import mytanita
@@ -63,6 +65,50 @@ def test_login_failure_raises():
     t.s = FakeSession(login_ok=False)
     with pytest.raises(MyTanitaError):
         t.login("a@example.com", "wrong")
+
+
+def test_login_page_without_token_raises():
+    t = MyTanita()
+    t.s = FakeSession()
+    t.s.get = lambda url, timeout=None: FakeResponse("<form></form>")
+    with pytest.raises(MyTanitaError, match="sign-in page has changed"):
+        t.login("a@example.com", "secret")
+
+
+def _security_output(monkeypatch, stdout, stderr, returncode=0):
+    """Answer `security` calls with this output; return the calls made, as (argv, stdin)."""
+    calls = []
+
+    def run(argv, input=None, **kwargs):
+        calls.append((argv, input))
+        return subprocess.CompletedProcess(argv, returncode, stdout, stderr)
+    monkeypatch.setattr(mytanita.subprocess, "run", run)
+    return calls
+
+
+def test_keychain_plain_password(monkeypatch):
+    _security_output(monkeypatch, '    "acct"<blob>="a@example.com"\n', 'password: "se"cret"\n')
+    assert mytanita.keychain_credentials() == ("a@example.com", 'se"cret')
+
+
+def test_keychain_non_ascii_password_is_printed_as_hex(monkeypatch):
+    # What `security -g` prints for 'pä"ss wörd$1'
+    stderr = 'password: 0x70C3A42273732077C3B672642431  "p\\303\\244"ss w\\303\\266rd$1"\n'
+    _security_output(monkeypatch, '    "acct"<blob>="a@example.com"\n', stderr)
+    assert mytanita.keychain_credentials() == ("a@example.com", 'pä"ss wörd$1')
+
+
+def test_keychain_missing_item(monkeypatch):
+    _security_output(monkeypatch, "", "security: The specified item could not be found.\n", returncode=44)
+    assert mytanita.keychain_credentials() is None
+
+
+def test_saved_password_goes_through_stdin_not_argv(monkeypatch):
+    calls = _security_output(monkeypatch, "", "")
+    mytanita.save_keychain_credentials("a@example.com", "secret")
+    (argv, stdin), = calls
+    assert "secret" not in argv and argv[-1] == "-w"
+    assert stdin == "secret\nsecret\n"
 
 
 def test_credentials_from_environment(monkeypatch):

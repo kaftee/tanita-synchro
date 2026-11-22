@@ -42,10 +42,11 @@ def login(tokenstore: str = DEFAULT_TOKENSTORE) -> Garmin:
         api = Garmin()
         api.login(tokenstore)
         return api
-    except Exception:
+    except Exception as e:
+        # Chained on purpose: cli.transient() looks for a network error behind this one.
         if not sys.stdin.isatty():
             raise GarminError(f"Garmin session in {tokenstore} is missing or expired; run "
-                              "tanita-synchro once in a terminal to sign in again")
+                              "tanita-synchro once in a terminal to sign in again") from e
     api = Garmin(email=input("Garmin email: ").strip(), password=getpass.getpass("Garmin password: "),
                  prompt_mfa=lambda: input("Garmin sent you a verification code, enter it: ").strip())
     try:

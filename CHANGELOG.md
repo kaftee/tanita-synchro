@@ -19,6 +19,15 @@
 ### Changed
 - An unexpected error (e.g. no network) now ends the run with exit code 2 (was
   1, the same as failed uploads).
+- Passwords are saved to the macOS Keychain through the `security` tool's
+  stdin, so they no longer appear on its command line.
+
+### Fixed
+- A MyTanita or SMTP password with non-ASCII characters (e.g. Polish letters)
+  saved in the Keychain was not read back, so it was asked for again on every
+  run.
+- A change to the MyTanita sign-in page now ends with a clear error instead of
+  a `TypeError` traceback.
 
 ## 0.1.0
 

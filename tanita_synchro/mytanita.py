@@ -77,19 +77,34 @@ def credentials() -> tuple[str, str]:
     return email, password
 
 
+def _keychain_value(text: str, prefix: str) -> str | None:
+    """A value from ``security find-generic-password -g`` output.
+
+    ``security`` prints a value as ``"text"``, or as ``0x<hex>  "escaped text"``
+    when it is not plain ASCII (e.g. a password with Polish letters).
+    """
+    m = re.search(rf"^\s*{re.escape(prefix)}0x([0-9A-Fa-f]+)", text, re.M)
+    if m:
+        return bytes.fromhex(m.group(1)).decode("utf-8")
+    m = re.search(rf'^\s*{re.escape(prefix)}"(.*)"$', text, re.M)
+    return m.group(1) if m else None
+
+
 def keychain_credentials(service: str = KEYCHAIN_SERVICE) -> tuple[str, str] | None:
     r = subprocess.run(["security", "find-generic-password", "-s", service, "-g"],
                        capture_output=True, text=True)
     if r.returncode != 0:
         return None
-    acct = re.search(r'"acct"<blob>="([^"]*)"', r.stdout)
-    pw = re.search(r'password: "(.*)"', r.stderr)
-    return (acct.group(1), pw.group(1)) if acct and pw else None
+    account = _keychain_value(r.stdout, '"acct"<blob>=')
+    password = _keychain_value(r.stderr, "password: ")
+    return (account, password) if account and password else None
 
 
 def save_keychain_credentials(account: str, password: str, service: str = KEYCHAIN_SERVICE) -> None:
-    subprocess.run(["security", "add-generic-password", "-U", "-s", service,
-                    "-a", account, "-w", password], check=True)
+    # A trailing -w without a value makes `security` read the password from stdin (twice, as
+    # if typed and retyped), which keeps it out of the process list.
+    subprocess.run(["security", "add-generic-password", "-U", "-s", service, "-a", account, "-w"],
+                   input=f"{password}\n{password}\n", capture_output=True, text=True, check=True)
 
 
 def local_zone() -> ZoneInfo:
@@ -111,7 +126,10 @@ class MyTanita:
     def login(self, email: str, password: str) -> None:
         page = self.s.get(f"{BASE}/en/user/login", timeout=30)
         page.raise_for_status()
-        token = BeautifulSoup(page.text, "html.parser").find("input", {"name": "token"})["value"]
+        field = BeautifulSoup(page.text, "html.parser").find("input", {"name": "token"})
+        if field is None or not field.get("value"):
+            raise MyTanitaError("MyTanita sign-in page has changed (no token field); please open a bug report")
+        token = field["value"]
         r = self.s.post(f"{BASE}/en/user/processlogin", timeout=30,
                         data={"mail": email, "password": password, "token": token, "login": "Login"})
         r.raise_for_status()

@@ -191,8 +191,8 @@ def test_garmin_resume_failing_on_the_network_is_retried(setup, sleeps, monkeypa
         if len(calls) == 1:
             try:
                 raise requests.ConnectionError("Connection reset by peer")
-            except requests.ConnectionError:
-                raise garmin.GarminError("Garmin session is missing or expired")
+            except requests.ConnectionError as e:
+                raise garmin.GarminError("Garmin session is missing or expired") from e
         return api
     monkeypatch.setattr(garmin, "login", login)
     assert cli.main(["--all", "--delay", "0"]) == cli.EXIT_OK
