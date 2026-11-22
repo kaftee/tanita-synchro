@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 ### Added
 - Failure mail: `--notify ADDRESS` mails the error when a run fails, over SMTP
