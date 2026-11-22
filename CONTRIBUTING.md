@@ -45,9 +45,7 @@ tokens are stored anywhere.
 
 1. Bump `version` in `pyproject.toml` and `__version__` in
    `tanita_synchro/__init__.py`, and add a `CHANGELOG.md` entry.
-2. Optional dry run: in the Actions tab, run **publish** manually with
-   `testpypi`, then check `pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ tanita-synchro`.
-3. Create a GitHub release with tag `vX.Y.Z` matching the version. Publishing
+2. Create a GitHub release with tag `vX.Y.Z` matching the version. Publishing
    the release uploads it to PyPI.
 
 ## Reporting a bug
