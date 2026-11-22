@@ -101,10 +101,12 @@ def keychain_credentials(service: str = KEYCHAIN_SERVICE) -> tuple[str, str] | N
 
 
 def save_keychain_credentials(account: str, password: str, service: str = KEYCHAIN_SERVICE) -> None:
-    # A trailing -w without a value makes `security` read the password from stdin (twice, as
-    # if typed and retyped), which keeps it out of the process list.
+    # A trailing -w without a value makes `security` prompt for the password (twice, as if typed
+    # and retyped), which keeps it out of the process list. It reads the answers from the terminal
+    # when it has one, so it runs in a new session without a controlling terminal and reads stdin.
     subprocess.run(["security", "add-generic-password", "-U", "-s", service, "-a", account, "-w"],
-                   input=f"{password}\n{password}\n", capture_output=True, text=True, check=True)
+                   input=f"{password}\n{password}\n", capture_output=True, text=True, check=True,
+                   start_new_session=True)
 
 
 def local_zone() -> ZoneInfo:

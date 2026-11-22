@@ -76,11 +76,11 @@ def test_login_page_without_token_raises():
 
 
 def _security_output(monkeypatch, stdout, stderr, returncode=0):
-    """Answer `security` calls with this output; return the calls made, as (argv, stdin)."""
+    """Answer `security` calls with this output; return the calls made, as (argv, stdin, kwargs)."""
     calls = []
 
     def run(argv, input=None, **kwargs):
-        calls.append((argv, input))
+        calls.append((argv, input, kwargs))
         return subprocess.CompletedProcess(argv, returncode, stdout, stderr)
     monkeypatch.setattr(mytanita.subprocess, "run", run)
     return calls
@@ -106,9 +106,11 @@ def test_keychain_missing_item(monkeypatch):
 def test_saved_password_goes_through_stdin_not_argv(monkeypatch):
     calls = _security_output(monkeypatch, "", "")
     mytanita.save_keychain_credentials("a@example.com", "secret")
-    (argv, stdin), = calls
+    (argv, stdin, kwargs), = calls
     assert "secret" not in argv and argv[-1] == "-w"
     assert stdin == "secret\nsecret\n"
+    # Without its own session, `security` would read the password from the terminal, not stdin
+    assert kwargs["start_new_session"] is True
 
 
 def test_credentials_from_environment(monkeypatch):
